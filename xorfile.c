@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include "log.h"
+#define BLOCKSIZE	1024
 
 long int get_file_size (char *filename) {
 	struct stat st;
@@ -98,30 +99,39 @@ int main(int argc, char *argv[])
 		outputfile = fopen(outputfilename, "wb");
 			
 			fileindex=0;
-			for (fileindex=0; fileindex < filesize_1 ;fileindex++)
+			while (fileindex < filesize_1 - BLOCKSIZE)
 			{
 				if ( fileindex > stepvalue) {
 					printf("File index: %ld \n",fileindex);
 					stepvalue = stepvalue + 1000000;
 				}
 				
-				keybuffer=malloc(1);
-				databuffer=malloc(1);
-				outputbuffer=malloc(1);
+				keybuffer=malloc(BLOCKSIZE);
+				databuffer=malloc(BLOCKSIZE);
+				outputbuffer=malloc(BLOCKSIZE);
 				fseek(keyfile, fileindex, SEEK_SET);
-				fread(keybuffer, 1,1,keyfile); 	
+				fread(keybuffer, BLOCKSIZE,1,keyfile); 	
 				fseek(datafile, fileindex, SEEK_SET);
-				fread(databuffer, 1,1,datafile);
+				fread(databuffer, BLOCKSIZE,1,datafile);
 			
-				outputbuffer[0] = databuffer[0] ^ keybuffer[0];
+				int blockloop=0;
+				for (blockloop=0; blockloop < BLOCKSIZE; blockloop++) {
+					outputbuffer[blockloop] = databuffer[blockloop] ^ keybuffer[blockloop];
+					if ( log_level == LOG_DEBUG ) {				
+						printf("[%d] %x ^",blockloop,databuffer[blockloop] & 0xff );
+						printf(" %x =",keybuffer[blockloop] & 0xff );
+						printf(" %x \n",outputbuffer[blockloop] & 0xff);
+					}
+					
+				}
+				 if ( log_level == LOG_DEBUG )
+				 		printf("\n");
 				
-				if ( log_level == LOG_DEBUG ) 				
-					printf("%x %x %x\n",databuffer[0] & 0xff , keybuffer[0] & 0xff , outputbuffer[0] & 0xff); 
-				
-				fwrite(outputbuffer,1,1,outputfile);		
+				fwrite(outputbuffer,BLOCKSIZE,1,outputfile);		
 				free(keybuffer);
 				free(databuffer);
-				free(outputbuffer);		
+				free(outputbuffer);	
+				fileindex=fileindex+BLOCKSIZE;
 			 }
 	 
 		fclose(datafile);
